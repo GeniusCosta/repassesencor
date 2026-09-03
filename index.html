@@ -212,6 +212,9 @@
   #cfgForm { display: grid; grid-template-columns: repeat(12, 1fr); gap: 10px; align-items: end; }
   .f-url { grid-column: span 6; }
   .f-token { grid-column: span 3; }
+  .token-wrap { display: flex; gap: 6px; align-items: stretch; }
+  .token-wrap input { flex: 1; min-width: 0; }
+  .token-wrap .btn { white-space: nowrap; }
   .f-cfgbtn { grid-column: span 3; }
   @media (max-width: 680px) {
     .f-url, .f-token, .f-cfgbtn { grid-column: span 12; }
@@ -328,7 +331,10 @@
       </div>
       <div class="field f-token">
         <label for="cfgToken">Código de acesso</label>
-        <input type="password" id="cfgToken" autocomplete="off">
+        <div class="token-wrap">
+          <input type="password" id="cfgToken" autocomplete="off">
+          <button type="button" id="verToken" class="btn small">Mostrar</button>
+        </div>
       </div>
       <div class="field f-cfgbtn">
         <button type="submit" class="btn primary">Conectar</button>
@@ -918,6 +924,13 @@
     gravarCfg();
     $("configPanel").hidden = true;
     carregar();
+  });
+
+  $("verToken").addEventListener("click", function () {
+    var campo = $("cfgToken");
+    var estavaEscondido = campo.type === "password";
+    campo.type = estavaEscondido ? "text" : "password";
+    this.textContent = estavaEscondido ? "Ocultar" : "Mostrar";
   });
 
   $("refreshBtn").addEventListener("click", function () { carregar(); });
