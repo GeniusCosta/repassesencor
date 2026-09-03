@@ -313,6 +313,7 @@
     o passo a passo completo está no arquivo LEIA-ME do projeto.
   </div>
   <div id="alertaFiscal" class="alerta-fiscal" hidden></div>
+  <div id="avisoDados" class="banner" hidden></div>
 
   <section class="panel" id="configPanel" hidden>
     <h3>Conexão com a Planilha Google</h3>
@@ -608,14 +609,32 @@
   }
 
   // ---------- cálculo e renderização ----------
-  function rotuloMes(m) {
-    return fmtMes.format(new Date(m + "-15T12:00:00"));
+  // "2026-09" -> verdadeiro
+  function mesValido(m) {
+    var s = String(m || "");
+    return s.length === 7 && s.charAt(4) === "-" &&
+           !isNaN(new Date(s + "-15T12:00:00").getTime());
   }
+
+  function rotuloMes(m) {
+    if (!mesValido(m)) return String(m);
+    var d = new Date(m + "-15T12:00:00");
+    return isNaN(d.getTime()) ? String(m) : fmtMes.format(d);
+  }
+
+  // um lançamento só entra nas contas se tiver data válida e favorecido conhecido
+  // "2026-09-05" -> verdadeiro; "05/09/2026" -> falso
+  function dataValida(l) {
+    var s = String(l.data || "");
+    return s.length === 10 && s.charAt(4) === "-" && s.charAt(7) === "-" &&
+           !isNaN(new Date(s + "T12:00:00").getTime());
+  }
+  function quemValido(l) { return l.quem === "Dimona" || l.quem === "Genius"; }
 
   // meses que têm algum lançamento, em ordem
   function mesesComDados() {
     var m = {};
-    state.lancamentos.forEach(function (l) { if (l.data) m[l.data.slice(0, 7)] = true; });
+    state.lancamentos.forEach(function (l) { if (dataValida(l)) m[l.data.slice(0, 7)] = true; });
     return Object.keys(m).sort();
   }
 
@@ -691,6 +710,30 @@
           brl(Math.round(s[quem].lucros * 0.10)));
       }
     });
+    // --- diagnóstico: avisa o que não entrou nos totais, em vez de zerar calado ---
+    var semData = state.lancamentos.filter(function (l) { return !dataValida(l); });
+    var semQuem = state.lancamentos.filter(function (l) { return dataValida(l) && !quemValido(l); });
+    var avisoDados = $("avisoDados");
+    var recados = [];
+    if (semData.length) {
+      recados.push(semData.length + (semData.length === 1 ? " lançamento tem" : " lançamentos têm") +
+        " a data em formato inesperado (ex.: “" + String(semData[0].data) +
+        "”) e por isso não entram em nenhum mês. Atualize o Codigo.gs no Apps Script.");
+    }
+    if (semQuem.length) {
+      var nomes = [];
+      semQuem.forEach(function (l) {
+        var n = String(l.quem || "(vazio)");
+        if (nomes.indexOf(n) < 0) nomes.push(n);
+      });
+      recados.push(semQuem.length + (semQuem.length === 1 ? " lançamento ficou" : " lançamentos ficaram") +
+        " fora dos totais porque o Favorecido não é Dimona nem Genius: " +
+        nomes.slice(0, 4).map(function (n) { return "“" + n + "”"; }).join(", ") +
+        ". Corrija a coluna Favorecido na planilha.");
+    }
+    avisoDados.hidden = recados.length === 0;
+    avisoDados.textContent = recados.join("  ");
+
     var alerta = $("alertaFiscal");
     alerta.hidden = avisos.length === 0;
     alerta.textContent = avisos.join("  •  ");
